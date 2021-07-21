@@ -1,3 +1,5 @@
+#Text Analytics Package for Medrxiv
+
 library(stringr)
 library(dplyr)
 library(stringi)

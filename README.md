@@ -1,3 +1,6 @@
+This is a a text analytics package created for medrxiv by using R programming.
+------------------------------------------------------------------------------
+
 Download the main_package.R file on your local machines and open it in RStudio.
 
 ------------------------------------------------------------------------
