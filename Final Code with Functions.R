@@ -1,3 +1,19 @@
+library(stringr)
+library(dplyr)
+library(stringi)
+library(tm)   # for text mining
+library(SnowballC)   # for text stemming
+library(wordcloud)     # word-cloud generator
+library(RColorBrewer)   # color palettes
+library(NLP)
+library(topicmodels)
+library(tidytext)
+library(reshape2)
+library(ggplot2)
+library(pals)
+library(Rcpp)
+library(igraph)
+
 data <- function(filename){
   dataset <<- read.delim(filename, 
                          header = FALSE, 
@@ -12,17 +28,12 @@ data('citations1.txt')
 
 
 abstract <- function(x, npar=TRUE, print=TRUE){
-  library(stringr)
-  library(dplyr)
-  #install.packages('stringi')
-  library(stringi)
   dataset2 <- as.data.frame(dataset)
   odd_row <- seq_len(nrow(dataset2)) %% 2
   odd_col <- dataset2[odd_row == 1,]
   abstract1 <- dataset2[odd_row == 0,]
   abstract2 <<- as.data.frame(abstract1)
   odd <<- as.data.frame(odd_col)
-  #View(odd)
   return(abstract2)
 }
 
@@ -43,11 +54,8 @@ doi()
 
 
 author <- function(x, npar=TRUE, print=TRUE){
-  #(\\w+)\\s(\\w+)\\s(\\w+)\\s[a-z][^abc]"
   pattern_author <- "([A-Z][a-z]+)\\s([A-Z]*(\\.*))\\w+\\s(\\w+\\s*\\w*)(\\..)"
-  #pattern_author <- c("(\\w+)\\s(\\w+)\\s", "al$")
   author_name <- str_match(odd[,1], pattern_author)
-  #author_name <- str_match(dataset[,1], regex("[a-z]", multiline = TRUE))
   author1 <<- as.data.frame(author_name[, 1])
   return(author1)
 }
@@ -60,7 +68,6 @@ title <- function(x, npar=TRUE, print=TRUE){
   pattern_title <- "(?<=\")(.*?)(?=\")"
   title1 <<- str_match(odd[, 1], pattern_title)
   title1 <<- as.data.frame(title1[, 1])
-  #return(View(title1))
   return(title1)
 }
 title()
@@ -71,28 +78,16 @@ title()
 article <- function(x, npar=TRUE, print=TRUE){
   article_df <<- data.frame(doi, title1, author1, abstract2)
   colnames(article_df) <- c("DOI Link", "Title", "Author", "Abstract")
-  #View(article_df$Abstract)
   return(article_df)
 }
 article()
 
 
 
-
-#install.packages("tm")           # for text mining
-#install.packages("SnowballC")    # for text stemming
-#install.packages("wordcloud")    # word-cloud generator
-#install.packages("RColorBrewer") # color palettes
 df <- data('citations1.txt')
+
 DTM <- function(dataframe){
-  # Load the packages
-  library(tm)
-  library(SnowballC)
-  library(wordcloud)
-  library(RColorBrewer)
-  
-  # To choose the text file
-  #text = readLines(file.choose())
+ 
   # VectorSource() function 
   # creates a corpus of 
   # character vectors
@@ -113,6 +108,7 @@ list_words <- DTM(article_df$abstract1)
 
 word_matrix <- function(list_words){
   common_words <- load("data_common_words.RData")
+  
   # Cleaning the Text
   docs1 = tm_map(docs1, content_transformer(tolower))
   docs1 = tm_map(docs1, removeNumbers)
@@ -128,9 +124,7 @@ word_matrix <- function(list_words){
   word_mat <<- data.frame(word = names(v),
                           freq = v)
   return(head(word_mat, 10))
-  #return(d)
 }
-#head(d, 10)
 
 matrix <- word_matrix()
 
@@ -147,10 +141,10 @@ wordcld <- function(matrix){
             rot.per = 0.3, 
             colors = brewer.pal(8, "Dark2"))
 }
+wordcld()
 
 
-
-
+#Generates the pie plot
 pieplot <- function(matrix)
 {
   library(ggplot2)
@@ -167,7 +161,7 @@ pieplot()
 
 
 
-
+#Gnenerates the bar plot
 barplot <- function(matrix)
 {
   library(ggplot2)
@@ -184,8 +178,7 @@ barplot()
 
 
 
-
-#install.packages("ggpubr")
+#Generates the dot line graph
 dotline <- function(matrix){
   library(ggpubr)
   ggplot(word_mat[1:20, ], aes(x=word_mat[1:20,]$word, y=word_mat[1:20, ]$freq)) +
@@ -203,26 +196,21 @@ dotline <- function(matrix){
 dotline()
 
 
-
-
+#Extract mutations from abstract
 mutation_fun <- function(dataset){  
   pattern_mutation <- "([a-z]{2})\\d+"
-  mutation <- str_match("rs12345", pattern_mutation)
+  mutation <- str_match(dataset, pattern_mutation)
   #View(mutation)
+  mutation <- as.data.frame(mutation[, 1])
   return(mutation)
 }
-mutation_fun()
+mutation_fun(article_df$abstract1)
 
 
-#medical subject heading (mesh) -> apply filter for word cloud
+load('data_common_words.RData')
 
-
-
-#install.packages('dplyr')
-library(dplyr)
-#install.packages('igraph')
  
-
+#Generates topic model 
 maketopicmodel <- function(x){
   docs <- VCorpus(VectorSource(x))   
   load('data_common_words.RData')
@@ -275,10 +263,12 @@ maketopicmodel <- function(x){
 
 maketopicmodel(article_df$abstract1)
 
-library(igraph)
+
+
 createtopics <- function(x){
   docs <- VCorpus(VectorSource(x))   
   load('data_common_words.RData')
+  
   # Text transformation
   toSpace <- content_transformer(
     function (x, pattern)
@@ -313,9 +303,12 @@ createtopics <- function(x){
   
 }
 
-ttopics <- createtopics(article_df$abstract1)
 
-text_link <- function(topics){
+topic_matrix <- createtopics(article_df$abstract1)
+
+
+#Creates a text network of one type
+text_network1 <- function(topics){
   my_adj_list <- topics %>% filter(beta > 0.025)
   names(my_adj_list) <- c('from', 'to', 'weight')
   class(my_adj_list)
@@ -330,8 +323,10 @@ text_link <- function(topics){
   plot(net, layout = layout_components(net), edge.width = E(net)$weight)
 }
 
-text_link(ttopics)
+text_network1(topic_matrix)
 
+
+#Creates a text network of second type
 text_network2 <- function(topics){
   my_adj_list <- topics %>% filter(beta > 0.025)
   names(my_adj_list) <- c('from', 'to', 'weight')
@@ -351,8 +346,10 @@ text_network2 <- function(topics){
   plot(net, layout = layout_components(net), edge.width = E(net)$weight, vertex.shape="none")
 }
 
-text_network2(ttopics)
+text_network2(topic_matrix)
 
+
+#Created a dendrogram
 text_network3 <- function(topics){
   my_adj_list <- topics %>% filter(beta > 0.025)
   names(my_adj_list) <- c('from', 'to', 'weight')
@@ -377,8 +374,10 @@ text_network3 <- function(topics){
   plot(ceb, net)
 }
 
-text_network3(ttopics)
+text_network3(topic_matrix)
 
+
+#Creates a text network of third type
 text_network4 <- function(topics){
   my_adj_list <- topics %>% filter(beta > 0.025)
   names(my_adj_list) <- c('from', 'to', 'weight')
@@ -399,17 +398,16 @@ text_network4 <- function(topics){
   set.seed(123)
   ceb <- cluster_edge_betweenness(net)
   
-  # community membership for each node
-  membership(ceb)
-  
   
   par(mar=orig_mar)
   dendPlot(ceb, mode="hclust")
   
 }
 
-text_network4(ttopics)
-----------------------------
+text_network4(topic_matrix)
+
+
+#Creates a text network of fourth type with 3D Nodes
   text_network5 <- function(topics){
     my_adj_list <- topics %>% filter(beta > 0.025)
     names(my_adj_list) <- c('from', 'to', 'weight')
@@ -434,13 +432,13 @@ text_network4(ttopics)
     plot(net, edge.arrow.size = 0.2,
          layout = layout_with_graphopt,
          vertex.color = rgb(1,0.8,0.4,0),
-         #vertex.color = 'grey50',          # Node color
+         #vertex.color = 'grey50',                    # Node color
          vertex.shape2="square",
-         vertex.shape="sphere", # One of "none", "circle", "square", "csquare", "rectangle" "crectangle", "vrectangle", "pie", "raster", or "sphere"
+         vertex.shape="sphere",                        # One of "none", "circle", "square", "csquare", "rectangle" "crectangle", "vrectangle", "pie", "raster", or "sphere"
          vertex.size=17,                               # Size of the node (default is 15)
          vertex.size2=15,                              # The second size of the node (e.g. for a rectangle)
          vertex.label.family="Aerial",
-         vertex.label.color="darkblue", # Font family of the label (e.g."Times", "Helvetica")
+         vertex.label.color="darkblue",                # Font family of the label (e.g."Times", "Helvetica")
          vertex.label.font=2,                          # Font: 1 plain, 2 bold, 3, italic, 4 bold italic, 5 symbol
          vertex.label.cex=0.9,                           # Font size (multiplication factor, device-dependent)
          vertex.label.dist=0,                          # Distance between the label and the vertex
@@ -456,9 +454,10 @@ text_network4(ttopics)
   }
 
 
-text_network5(ttopics)
+text_network5(topic_matrix)
 
 
------------------------------------------------------------
+
+#END OF CODE
   
   
