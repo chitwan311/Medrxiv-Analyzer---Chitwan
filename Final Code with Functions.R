@@ -207,7 +207,7 @@ dotline()
 
 mutation_fun <- function(dataset){  
   pattern_mutation <- "([a-z]{2})\\d+"
-  mutation <- str_match("rs773866720", pattern_mutation)
+  mutation <- str_match("rs12345", pattern_mutation)
   #View(mutation)
   return(mutation)
 }
@@ -218,27 +218,34 @@ mutation_fun()
 
 
 
+#install.packages('dplyr')
+library(dplyr)
+#install.packages('igraph')
+ 
 
-NLP_Model <- function(x, npar=TRUE, print=TRUE){
-  library(topicmodels)
-  
-  data_tm <- article$Abstract
-  
-  #install.packages('tidytext')
-  library(tidytext)
+maketopicmodel <- function(x){
+  docs <- VCorpus(VectorSource(x))   
+  load('data_common_words.RData')
+  # Text transformation
+  toSpace <- content_transformer(
+    function (x, pattern)
+      gsub(pattern, " ", x))
+  docs1 <- tm_map(docs, toSpace, "/")
+  docs1 <- tm_map(docs, toSpace, "@")
+  docs1 <- tm_map(docs, toSpace, "#")
+  docs1 <- tm_map(docs1, content_transformer(tolower))
+  docs1 <- tm_map(docs1, removeNumbers)
+  docs1 <- tm_map(docs1, removeWords, stopwords("english"))
+  docs1 <- tm_map(docs1, removeWords, data_common_words)
+  docs1 <- tm_map(docs1, stripWhitespace)
   
   DTM <- DocumentTermMatrix(docs1, control = list(bounds = list(global = c(5, Inf))))
-  dim(DTM)
-  
   
   sel_idx <- slam::row_sums(DTM) > 0
   DTM <- DTM[sel_idx, ]
-  #textdata <- textdata[sel_idx, ]
   
   K <- 10
   topicModel <- LDA(DTM, K)
-  
-  
   tmResult <- posterior(topicModel)
   attributes(tmResult)
   nTerms(DTM)   
@@ -249,10 +256,7 @@ NLP_Model <- function(x, npar=TRUE, print=TRUE){
   rowSums(thetas)[1:10] 
   terms(topicModel, 10)
   
-  topics <<- tidy(topicModel, matrix = "beta")
-  topics
-  text_network1(topics)
-  
+  topics <- tidy(topicModel, matrix = "beta")
   top_terms <- topics %>%
     group_by(topic) %>%
     slice_max(beta, n = 10) %>% 
@@ -265,35 +269,71 @@ NLP_Model <- function(x, npar=TRUE, print=TRUE){
     geom_col(show.legend = FALSE) +
     facet_wrap(~ topic, scales = "free") +
     scale_y_reordered() 
+  
+  
 }
 
+maketopicmodel(article_df$abstract1)
 
+library(igraph)
+createtopics <- function(x){
+  docs <- VCorpus(VectorSource(x))   
+  load('data_common_words.RData')
+  # Text transformation
+  toSpace <- content_transformer(
+    function (x, pattern)
+      gsub(pattern, " ", x))
+  docs1 <- tm_map(docs, toSpace, "/")
+  docs1 <- tm_map(docs, toSpace, "@")
+  docs1 <- tm_map(docs, toSpace, "#")
+  docs1 <- tm_map(docs1, content_transformer(tolower))
+  docs1 <- tm_map(docs1, removeNumbers)
+  docs1 <- tm_map(docs1, removeWords, stopwords("english"))
+  docs1 <- tm_map(docs1, removeWords, data_common_words)
+  docs1 <- tm_map(docs1, stripWhitespace)
+  
+  DTM <- DocumentTermMatrix(docs1, control = list(bounds = list(global = c(5, Inf))))
+  
+  sel_idx <- slam::row_sums(DTM) > 0
+  DTM <- DTM[sel_idx, ]
+  
+  K <- 10
+  topicModel <- LDA(DTM, K)
+  tmResult <- posterior(topicModel)
+  attributes(tmResult)
+  nTerms(DTM)   
+  betas <- tmResult$terms  
+  dim(beta)  
+  thetas <- tmResult$topics 
+  
+  rowSums(thetas)[1:10] 
+  terms(topicModel, 10)
+  
+  topics <- tidy(topicModel, matrix = "beta")
+  
+}
 
-#install.packages('dplyr')
-library(dplyr)
-#install.packages('igraph')
+ttopics <- createtopics(article_df$abstract1)
 
-text_network1 <- function(topics){
+text_link <- function(topics){
   my_adj_list <- topics %>% filter(beta > 0.025)
   names(my_adj_list) <- c('from', 'to', 'weight')
   class(my_adj_list)
   dim(my_adj_list)
-  library(igraph)
   # create igraph S3 object
   net <- graph.data.frame(my_adj_list, directed = FALSE)
   # store original margins
   orig_mar <- par()$mar
   # set new margins to limit whitespace in plot
   par(mar=rep(.1, 4))
-  set.seed(123)
   
   plot(net, layout = layout_components(net), edge.width = E(net)$weight)
-  
 }
 
+text_link(ttopics)
 
-text_network2 <- function(x, npar=TRUE, print=TRUE){
-  data.frame(my_adj_list) <- data.frame(topics) %>% filter(beta > 0.025)
+text_network2 <- function(topics){
+  my_adj_list <- topics %>% filter(beta > 0.025)
   names(my_adj_list) <- c('from', 'to', 'weight')
   class(my_adj_list)
   dim(my_adj_list)
@@ -311,7 +351,9 @@ text_network2 <- function(x, npar=TRUE, print=TRUE){
   plot(net, layout = layout_components(net), edge.width = E(net)$weight, vertex.shape="none")
 }
 
-text_network3 <- function(x, npar=TRUE, print=TRUE){
+text_network2(ttopics)
+
+text_network3 <- function(topics){
   my_adj_list <- topics %>% filter(beta > 0.025)
   names(my_adj_list) <- c('from', 'to', 'weight')
   class(my_adj_list)
@@ -335,8 +377,9 @@ text_network3 <- function(x, npar=TRUE, print=TRUE){
   plot(ceb, net)
 }
 
+text_network3(ttopics)
 
-text_network4 <- function(x, npar=TRUE, print=TRUE){
+text_network4 <- function(topics){
   my_adj_list <- topics %>% filter(beta > 0.025)
   names(my_adj_list) <- c('from', 'to', 'weight')
   
@@ -354,6 +397,7 @@ text_network4 <- function(x, npar=TRUE, print=TRUE){
   # set new margins to limit whitespace in plot
   par(mar=rep(.1, 4))
   set.seed(123)
+  ceb <- cluster_edge_betweenness(net)
   
   # community membership for each node
   membership(ceb)
@@ -363,8 +407,10 @@ text_network4 <- function(x, npar=TRUE, print=TRUE){
   dendPlot(ceb, mode="hclust")
   
 }
+
+text_network4(ttopics)
 ----------------------------
-  text_network5 <- function(x, npar=TRUE, print=TRUE){
+  text_network5 <- function(topics){
     my_adj_list <- topics %>% filter(beta > 0.025)
     names(my_adj_list) <- c('from', 'to', 'weight')
     
@@ -408,6 +454,9 @@ text_network4 <- function(x, npar=TRUE, print=TRUE){
          arrow.mode="all")
     
   }
+
+
+text_network5(ttopics)
 
 
 -----------------------------------------------------------

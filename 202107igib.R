@@ -260,7 +260,170 @@ text_network1 <- function(x, npar=TRUE, print=TRUE){
 }
 
 
+createtopics <- function(x){
+  docs <- VCorpus(VectorSource(x))   
+  
+  # Text transformation
+  toSpace <- content_transformer(
+    function (x, pattern)
+      gsub(pattern, " ", x))
+  docs1 <- tm_map(docs, toSpace, "/")
+  docs1 <- tm_map(docs, toSpace, "@")
+  docs1 <- tm_map(docs, toSpace, "#")
+  docs1 <- tm_map(docs1, content_transformer(tolower))
+  docs1 <- tm_map(docs1, removeNumbers)
+  docs1 <- tm_map(docs1, removeWords, stopwords("english"))
+  docs1 <- tm_map(docs1, removeWords, data_common_words)
+  docs1 <- tm_map(docs1, stripWhitespace)
+  
+  DTM <- DocumentTermMatrix(docs1, control = list(bounds = list(global = c(5, Inf))))
+  
+  sel_idx <- slam::row_sums(DTM) > 0
+  DTM <- DTM[sel_idx, ]
+  
+  K <- 10
+  topicModel <- LDA(DTM, K)
+  tmResult <- posterior(topicModel)
+  attributes(tmResult)
+  nTerms(DTM)   
+  betas <- tmResult$terms  
+  dim(beta)  
+  thetas <- tmResult$topics 
+  
+  rowSums(thetas)[1:10] 
+  terms(topicModel, 10)
+  
+  topics <- tidy(topicModel, matrix = "beta")
+  
+}
 
+text_link <- function(topics){
+  my_adj_list <- topics %>% filter(beta > 0.025)
+  names(my_adj_list) <- c('from', 'to', 'weight')
+  class(my_adj_list)
+  dim(my_adj_list)
+  # create igraph S3 object
+  net <- graph.data.frame(my_adj_list, directed = FALSE)
+  # store original margins
+  orig_mar <- par()$mar
+  # set new margins to limit whitespace in plot
+  par(mar=rep(.1, 4))
+  
+  plot(net, layout = layout_components(net), edge.width = E(net)$weight)
+}
+
+text_link(ttopics)
+
+
+
+
+
+
+maketopicmodel <- function(x){
+  docs <- VCorpus(VectorSource(x))   
+  load('data_common_words.RData')
+  # Text transformation
+  toSpace <- content_transformer(
+    function (x, pattern)
+      gsub(pattern, " ", x))
+  docs1 <- tm_map(docs, toSpace, "/")
+  docs1 <- tm_map(docs, toSpace, "@")
+  docs1 <- tm_map(docs, toSpace, "#")
+  docs1 <- tm_map(docs1, content_transformer(tolower))
+  docs1 <- tm_map(docs1, removeNumbers)
+  docs1 <- tm_map(docs1, removeWords, stopwords("english"))
+  docs1 <- tm_map(docs1, removeWords, data_common_words)
+  docs1 <- tm_map(docs1, stripWhitespace)
+  
+  DTM <- DocumentTermMatrix(docs1, control = list(bounds = list(global = c(5, Inf))))
+  
+  sel_idx <- slam::row_sums(DTM) > 0
+  DTM <- DTM[sel_idx, ]
+  
+  K <- 10
+  topicModel <- LDA(DTM, K)
+  tmResult <- posterior(topicModel)
+  attributes(tmResult)
+  nTerms(DTM)   
+  betas <- tmResult$terms  
+  dim(beta)  
+  thetas <- tmResult$topics 
+  
+  rowSums(thetas)[1:10] 
+  terms(topicModel, 10)
+  
+  topics <- tidy(topicModel, matrix = "beta")
+  top_terms <- topics %>%
+    group_by(topic) %>%
+    slice_max(beta, n = 10) %>% 
+    ungroup() %>%
+    arrange(topic, -beta)
+  
+  top_terms %>%
+    mutate(term = reorder_within(term, beta, topic)) %>%
+    ggplot(aes(beta, term, fill = factor(topic))) +
+    geom_col(show.legend = FALSE) +
+    facet_wrap(~ topic, scales = "free") +
+    scale_y_reordered() 
+  
+  
+}
+library(igraph)
+createtopics <- function(x){
+  docs <- VCorpus(VectorSource(x))   
+  load('data_common_words.RData')
+  # Text transformation
+  toSpace <- content_transformer(
+    function (x, pattern)
+      gsub(pattern, " ", x))
+  docs1 <- tm_map(docs, toSpace, "/")
+  docs1 <- tm_map(docs, toSpace, "@")
+  docs1 <- tm_map(docs, toSpace, "#")
+  docs1 <- tm_map(docs1, content_transformer(tolower))
+  docs1 <- tm_map(docs1, removeNumbers)
+  docs1 <- tm_map(docs1, removeWords, stopwords("english"))
+  docs1 <- tm_map(docs1, removeWords, data_common_words)
+  docs1 <- tm_map(docs1, stripWhitespace)
+  
+  DTM <- DocumentTermMatrix(docs1, control = list(bounds = list(global = c(5, Inf))))
+  
+  sel_idx <- slam::row_sums(DTM) > 0
+  DTM <- DTM[sel_idx, ]
+  
+  K <- 10
+  topicModel <- LDA(DTM, K)
+  tmResult <- posterior(topicModel)
+  attributes(tmResult)
+  nTerms(DTM)   
+  betas <- tmResult$terms  
+  dim(beta)  
+  thetas <- tmResult$topics 
+  
+  rowSums(thetas)[1:10] 
+  terms(topicModel, 10)
+  
+  topics <- tidy(topicModel, matrix = "beta")
+  
+}
+
+ttopics <- createtopics(article_df$abstract1)
+
+text_link <- function(topics){
+  my_adj_list <- topics %>% filter(beta > 0.025)
+  names(my_adj_list) <- c('from', 'to', 'weight')
+  class(my_adj_list)
+  dim(my_adj_list)
+  # create igraph S3 object
+  net <- graph.data.frame(my_adj_list, directed = FALSE)
+  # store original margins
+  orig_mar <- par()$mar
+  # set new margins to limit whitespace in plot
+  par(mar=rep(.1, 4))
+  
+  plot(net, layout = layout_components(net), edge.width = E(net)$weight)
+}
+
+text_link(ttopics)
 
 
 -----------------------------------------------------------
