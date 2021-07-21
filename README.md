@@ -1,4 +1,4 @@
-Download the main.R file on your local machines and open it in RStudio.
+Download the main_package.R file on your local machines and open it in RStudio.
 
 ------------------------------------------------------------------------
 
